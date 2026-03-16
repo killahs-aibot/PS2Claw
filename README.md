@@ -77,13 +77,13 @@ Output sizes:
 - Uses libcurl + wolfSSL for HTTPS
 
 ### GUI Design
-**RETRO TERMINAL** 🏚️
+**POST-APOCALYPTIC TERMINAL** 🏚️
 
 - Retro CRT terminal aesthetic
 - Green/amber monochrome on black
 - Scanlines, flicker effects
 - ASCII art headers
-- Hacker BBS vibe
+- Fallout-style / hacker bbs vibe
 - Pixelated terminal font
 
 ## Key References
