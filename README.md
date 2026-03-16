@@ -1,5 +1,7 @@
 # PS2Claw 🕹️🤖
 
+> ⚠️ **Experimental Alpha** — This is a proof-of-concept. Expect bugs, crashes, and weirdness. Running AI on 1999 hardware wasn't supposed to work, but here we are.
+
 **The first AI assistant running on a 1999 PlayStation 2**
 
 ## The Mission
