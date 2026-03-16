@@ -1,10 +1,9 @@
-# PS2Claw Makefile - Native PS2 Build
+# PS2Claw Makefile - Console-Only Version (No gsKit)
 # Target: mips64r5900el-ps2-elf (PS2 bare metal)
 
 # Toolchain paths
 PS2DEV = /home/killahbot/.local/ps2dev
 PS2SDK = $(PS2DEV)/ps2sdk
-GSKIT = $(PS2DEV)/gsKit
 PREFIX = $(PS2DEV)/ee/bin/mips64r5900el-ps2-elf
 
 CC = $(PREFIX)-gcc
@@ -16,22 +15,18 @@ STRIP = $(PREFIX)-strip
 # PS2SDK library paths
 EE_LIB = $(PS2SDK)/ee/lib
 PORTS_LIB = $(PS2SDK)/ports/lib
-GSKIT_LIB = $(GSKIT)/lib
 
 # Include paths
 EE_INC = -I$(PS2SDK)/ee/include -I$(PS2SDK)/common/include
 PORTS_INC = -I$(PS2SDK)/ports/include
-GSKIT_INC = -I$(GSKIT)/include
 
 # Compiler flags
 CFLAGS = -D_EE -G0 -O2 -Wall -ffreestanding
-CFLAGS += $(EE_INC) $(PORTS_INC) $(GSKIT_INC)
+CFLAGS += $(EE_INC) $(PORTS_INC)
 
-# Linker flags - produces ELF directly
-LDFLAGS = -L$(EE_LIB) -L$(PORTS_LIB) -L$(GSKIT_LIB)
-LDFLAGS += -lcurl -lwolfssl -lz -lnetman -lps2ip -ldebug -lpatches
-LDFLAGS += -lcglue -lkernel -lstdc++ -lsupc++ -lm
-LDFLAGS += -lgskit -lgskit_toolkit -ldmakit -lfont
+# Linker flags
+LDFLAGS = -L$(EE_LIB) -L$(PORTS_LIB)
+LDFLAGS += -lcurl -lwolfssl -lz -lnetman -lps2ip -ldebug -lcglue -lkernel -lstdc++ -lsupc++ -lm
 
 # Output
 TARGET = PS2CLAW.ELF
@@ -60,4 +55,4 @@ check:
 	$(CC) --version | head -1
 	@echo "SDK: $(PS2SDK)"
 	@echo "Libraries:"
-	@ls $(EE_LIB)/libcglue.a $(PORTS_LIB)/libcurl.a 2>/dev/null
+	ls $(EE_LIB)/libcglue.a $(PORTS_LIB)/libcurl.a 2>/dev/null

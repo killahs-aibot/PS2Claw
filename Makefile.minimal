@@ -1,0 +1,36 @@
+# PS2Claw Makefile - Minimal Build (no network)
+PS2DEV = /home/killahbot/.local/ps2dev
+PS2SDK = $(PS2DEV)/ps2sdk
+PREFIX = $(PS2DEV)/ee/bin/mips64r5900el-ps2-elf
+
+CC = $(PREFIX)-gcc
+
+EE_LIB = $(PS2SDK)/ee/lib
+PORTS_LIB = $(PS2SDK)/ports/lib
+
+EE_INC = -I$(PS2SDK)/ee/include -I$(PS2SDK)/common/include
+PORTS_INC = -I$(PS2SDK)/ports/include
+GSKIT_INC = -I$(PS2DEV)/gsKit/include
+
+CFLAGS = -D_EE -G0 -O2 -Wall -ffreestanding
+CFLAGS += $(EE_INC) $(PORTS_INC) $(GSKIT_INC)
+
+LDFLAGS = -L$(EE_LIB) -L$(PORTS_LIB) -L$(PS2DEV)/gsKit/lib
+LDFLAGS += -lgskit -lgskit_toolkit -ldmakit -lfont -ldebug
+LDFLAGS += -lcglue -lkernel -lstdc++ -lsupc++ -lm
+
+TARGET = PS2CLAW.ELF
+OBJS = main.o
+
+all: $(TARGET)
+
+$(TARGET): $(OBJS)
+	$(CC) -T $(PS2SDK)/ee/startup/linkfile $(OBJS) $(LDFLAGS) -o $(TARGET)
+	@file $(TARGET)
+	@ls -lh $(TARGET)
+
+main.o: src/main.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -f $(OBJS) $(TARGET)
