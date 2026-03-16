@@ -60,7 +60,7 @@ For live AI responses, you need internet:
 ### Optional Environment Variables
 
 - `OPENROUTER_API_KEY` - Your OpenRouter API key (required)
-- `MODEL` - Model to use (default: `google/gemini-2.0-flash-001`)
+- `MODEL` - Model to use (default: `google/gemini-3.1-flash-lite-preview`)
 
 ## Build from Source
 

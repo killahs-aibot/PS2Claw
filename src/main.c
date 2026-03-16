@@ -31,7 +31,7 @@ static const char *demo_responses[DEMO_RESPONSES] = {
 
 /* API Configuration */
 #define API_URL "https://openrouter.ai/api/v1/chat/completions"
-#define DEFAULT_MODEL "google/gemini-2.0-flash-001"
+#define DEFAULT_MODEL "google/gemini-3.1-flash-lite-preview"
 #define MAX_PROMPT 1024
 #define MAX_RESPONSE 4096
 
