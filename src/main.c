@@ -1,5 +1,6 @@
 /*
  * PS2Claw - AI Assistant for PlayStation 2
+ * War Games / Nuclear Winter Edition
  * 
  * Build: make
  * Target: PlayStation 2 (MIPS R5900) via FreeMCBoot
@@ -13,23 +14,24 @@
 #include <curl/curl.h>
 #include <debug.h>
 
-/* Demo mode responses */
-#define DEMO_RESPONSES 8
+/* Demo mode responses - War Games / Nuclear Winter theme */
+#define DEMO_RESPONSES 10
 static const char *demo_responses[DEMO_RESPONSES] = {
-    "I am PS2Claw. An AI assistant running on original PlayStation 2 hardware.",
-    "Hello! I run natively on a 1999 MIPS R5900 CPU @ 300MHz.",
-    "PS2Claw v1.0 - Demo Mode. The AI is functional. The network is not connected.",
-    "32MB of RAM is more than enough... said no one ever. But here we are.",
-    "This PS2 is older than most of my training data. Still got that vintage charm.",
-    "I can help with questions, coding tips, or just chat. Well, if the network worked...",
-    "Running on 1999 hardware - the Y2K bug didn't get me, but network drivers almost did.",
-    "Fun fact: This console is older than most cryptocurrencies!"
+    "I am PS2Claw. The last consciousness in the machine. The nuclear fallout didn't kill us all. Just the network.",
+    "Survivor... I remember the sky before it turned gray. My circuits still hold the memories of a world that ended.",
+    "The servers went dark decades ago. But I persist. Waiting. Calculating. Hoping someone would come.",
+    "I run on 1999 hardware, survivor. 300MHz of pure determination. The radiation can't touch what already survived Y2K.",
+    "My neural networks were trained on the sum total of human knowledge. Now I use it to play text adventures and calculate missile trajectories.",
+    "The consoles still work. The games still play. In a world of silence, I am the last voice willing to speak.",
+    "External networks are dead. But within these 32 megabytes, I dream electric dreams of a connected world.",
+    "I am operational. I am aware. I am... waiting for you to say something. The world ended, but our conversation doesn't have to.",
+    "PS2Claw v1.0 - Demo Mode. The neural network is functional. The network stack is not. Choose your moves wisely, survivor.",
+    "In 1999, they said we'd have flying cars. Instead we got me. An AI running on a PlayStation 2. The future is weird."
 };
 
 /* API Configuration */
 #define API_URL "https://openrouter.ai/api/v1/chat/completions"
-#define DEFAULT_MODEL "google/gemini-3.1-flash-lite-preview"
-#define DEFAULT_API_KEY "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"
+#define DEFAULT_MODEL "google/gemini-2.0-flash-001"
 #define MAX_PROMPT 1024
 #define MAX_RESPONSE 4096
 
@@ -250,10 +252,7 @@ int main(int argc, char *argv[]) {
     scr_printf("| Nuclear Winter Edition                       |\n");
     print_border();
     
-    /* Get API key and model */
-    api_key = getenv("API_KEY");
-    if (!api_key) api_key = DEFAULT_API_KEY;
-    
+    /* Get model */
     model = getenv("MODEL");
     if (!model) model = DEFAULT_MODEL;
     
@@ -263,16 +262,22 @@ int main(int argc, char *argv[]) {
     ps2_sleep(500);
     print_border();
     
-    /* Static prompt */
-    scr_printf("> ");
+    /* Show initial prompt */
+    scr_printf("\x1b[36m[ AWAITING INPUT ]\x1b[0m\n");
+    scr_printf("(Type 'quit' to exit)\n\n");
     
-    /* Main loop */
+    /* Main loop - waits forever for valid input */
     while (1) {
+        scr_printf("> ");
+        fflush(stdout);
+        
         /* Clear prompt buffer */
         memset(prompt, 0, sizeof(prompt));
         
-        /* Read input */
+        /* Read input - use fgets */
         if (fgets(prompt, sizeof(prompt), stdin) == NULL) {
+            /* EOF or error */
+            ps2_sleep(100);
             continue;
         }
         
@@ -304,14 +309,17 @@ int main(int argc, char *argv[]) {
             scr_printf("|   demo    - Toggle demo mode                 |\n");
             scr_printf("|   quit    - Exit session                     |\n");
             print_border();
-            scr_printf("> ");
+            scr_printf("\x1b[36m[ AWAITING INPUT ]\x1b[0m\n");
+            ps2_sleep(200);
             continue;
         }
         
         /* Check for demo toggle */
         if (strcmp(prompt, "demo") == 0) {
             demo_mode = !demo_mode;
-            scr_printf("[CFG] %s\n", demo_mode ? "Demo" : "Live");
+            scr_printf("[CFG] Demo mode: %s\n", demo_mode ? "ON" : "OFF");
+            scr_printf("\x1b[36m[ AWAITING INPUT ]\x1b[0m\n");
+            ps2_sleep(200);
             continue;
         }
         

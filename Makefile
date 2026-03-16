@@ -26,7 +26,7 @@ CFLAGS += $(EE_INC) $(PORTS_INC)
 
 # Linker flags
 LDFLAGS = -L$(EE_LIB) -L$(PORTS_LIB)
-LDFLAGS += -lcurl -lwolfssl -lz -lnetman -lps2ip -ldebug -lcglue -lkernel -lstdc++ -lsupc++ -lm -lpad
+LDFLAGS += -lcurl -lwolfssl -lz -lnetman -lps2ip -ldebug -lcglue -lkernel -lstdc++ -lsupc++ -lm
 
 # Output
 TARGET = PS2CLAW.ELF
