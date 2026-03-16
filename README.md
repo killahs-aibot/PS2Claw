@@ -17,16 +17,45 @@ Run a lightweight AI assistant on original PlayStation 2 hardware. Because even 
 
 ## Installation (End User)
 
-Super simple — no Linux needed!
+Super simple — no Linux needed! Choose one method:
 
-1. Copy `PS2CLAW.ELF` (or `PS2CLAW-packed.elf` for smaller size) to USB/memory card
-2. Install FreeMCBoot: https://israpps.github.io/FreeMcBoot-Installer/
+### Option A: FreeDVDBoot (No modding required!)
+
+1. Download FreeDVDBoot ISO: https://github.com/CTurt/FreeDVDBoot
+2. Set your PS2 language to English (boot without disc → Circle → System Config → Language)
+3. Burn the ISO to a DVD-R (lowest speed, finalize disc)
+4. Copy `PS2CLAW.ELF` to a USB drive
+5. Insert DVD, wait for uLaunchELF to load
+6. Navigate to USB → PS2CLAW.ELF → Press X to run
+
+### Option B: FreeMCBoot (Memory card hack)
+
+1. Install FreeMCBoot: https://israpps.github.io/FreeMcBoot-Installer/
+2. Copy `PS2CLAW.ELF` to USB/memory card
 3. Launch from FreeMCBoot OSD
-4. Set your API key:
-   ```
-   export OPENROUTER_API_KEY=your_key_here
-   ```
-5. Enjoy 🤖
+
+### Set your API key
+
+```
+export OPENROUTER_API_KEY=your_key_here
+```
+
+Get a free key at: https://openrouter.ai
+
+Enjoy 🤖
+
+### Set Up Network
+
+For live AI responses, you need internet:
+
+1. **Wired Ethernet** (recommended):
+   - Use a **USB Ethernet Adapter** (Sony SCPH-10181 or AX88172-based)
+   - Connect Ethernet cable from PS2 to router
+   - Most routers have DHCP enabled automatically
+
+2. **WiFi** (more complex):
+   - Use a compatible WiFi adapter, or
+   - Use a Powerline adapter (Ethernet over home wiring)
 
 ### Optional Environment Variables
 
@@ -88,7 +117,8 @@ Output sizes:
 
 ## Key References
 
-- [FreeMCBoot Installer](https://israpps.github.io/FreeMcBoot-Installer/) - How to run homebrew
+- [FreeDVDBoot](https://github.com/CTurt/FreeDVDBoot) - Exploit DVD player to run homebrew (no mod needed!)
+- [FreeMCBoot Installer](https://israpps.github.io/FreeMcBoot-Installer/) - Memory card hack
 - [PS2 Dev Wiki](https://www.psdevwiki.com/ps2/Main_Page) - PS2 developer info
 - [PS2SDK](https://github.com/ps2dev/ps2sdk) - Official PS2 development kit
 - [ps2dev](https://github.com/ps2dev/ps2dev) - Toolchain setup
@@ -101,6 +131,23 @@ Output sizes:
 - [ ] Add post-apocalyptic CRT GUI (future enhancement)
 - [x] Package as ELF for FreeMCBoot
 - [ ] Test on real hardware
+
+## Troubleshooting
+
+**Black screen after loading:**
+- Try different USB port (front vs back)
+- Ensure ELF is in correct folder
+- Try OpenPS2Loader instead of SMS
+
+**Network not working:**
+- Use official Sony LAN adapter for best compatibility
+- Check cable is good
+- Router must have DHCP (most do)
+
+**Slow responses:**
+- PS2 network is 10/100Mbps max
+- AI API takes time to respond
+- Be patient - it's 1999 hardware! 😅
 
 ## Project Structure
 
