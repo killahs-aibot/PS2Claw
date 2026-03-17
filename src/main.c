@@ -15,6 +15,8 @@
 #include <time.h>
 #include <curl/curl.h>
 #include <debug.h>
+#include <libkbd.h>
+#include <ps2kbd.h>
 
 /* Demo mode responses - War Games / Nuclear Winter theme */
 #define DEMO_RESPONSES 10
@@ -596,6 +598,171 @@ static void ps2_sleep(int ms) {
     }
 }
 
+/* Simple ASCII lookup for raw keyboard codes */
+static char keycode_to_ascii(u8 key, int shifted) {
+    /* Check for alphanumeric keys - key is the USB key code */
+    
+    /* Number row (unshifted) */
+    if (key == 0x16) return shifted ? '!' : '1';
+    if (key == 0x1E) return shifted ? '@' : '2';
+    if (key == 0x26) return shifted ? '#' : '3';
+    if (key == 0x25) return shifted ? '$' : '4';
+    if (key == 0x2E) return shifted ? '%' : '5';
+    if (key == 0x36) return shifted ? '^' : '6';
+    if (key == 0x3D) return shifted ? '&' : '7';
+    if (key == 0x3E) return shifted ? '*' : '8';
+    if (key == 0x46) return shifted ? '(' : '9';
+    if (key == 0x45) return shifted ? ')' : '0';
+    
+    /* Letters A-Z */
+    if (key >= 0x1C && key <= 0x32) {
+        /* 0x1C = 'A', 0x32 = 'Z' */
+        char base = 'a' + (key - 0x1C);
+        return shifted ? (base - 'a' + 'A') : base;
+    }
+    
+    /* Common punctuation */
+    if (key == 0x4E) return shifted ? '_' : '-';
+    if (key == 0x55) return shifted ? '+' : '=';
+    if (key == 0x5D) return shifted ? '|' : '\\';
+    if (key == 0x54) return shifted ? '{' : '[';
+    if (key == 0x5B) return shifted ? '}' : ']';
+    if (key == 0x4C) return shifted ? ':' : ';';
+    if (key == 0x52) return shifted ? '"' : '\'';
+    if (key == 0x41) return shifted ? '<' : ',';
+    if (key == 0x49) return shifted ? '>' : '.';
+    if (key == 0x4A) return shifted ? '?' : '/';
+    if (key == 0x0E) return shifted ? '~' : '`';
+    
+    /* Special keys */
+    if (key == 0x66) return 0x08; /* Backspace */
+    if (key == 0x5A) return 0x0D; /* Enter */
+    if (key == 0x0F) return 0x09; /* TAB */
+    if (key == 0x76) return 0x1B; /* Escape */
+    
+    return 0;
+}
+
+/* Track shift state */
+static int shift_pressed = 0;
+
+/* Read keyboard input with character building */
+static int read_kbd_line(char *buffer, int max_len) {
+    int pos = 0;
+    buffer[0] = '\0';
+    
+    /* Set raw mode and blocking */
+    PS2KbdSetReadmode(PS2KBD_READMODE_RAW);
+    PS2KbdSetBlockingMode(PS2KBD_BLOCKING);
+    
+    while (1) {
+        PS2KbdRawKey raw;
+        int result = PS2KbdReadRaw(&raw);
+        
+        if (result < 0) {
+            /* Error reading - wait and retry */
+            ps2_sleep(10);
+            continue;
+        }
+        
+        /* Check for key up (0xF0 = key released) - toggle shift off */
+        if (raw.state == PS2KBD_RAWKEY_UP) {
+            if (raw.key == 0x12 || raw.key == 0x59) {
+                /* Left or right shift released */
+                shift_pressed = 0;
+            }
+            continue;
+        }
+        
+        /* Check for key down (0xF1 or 0xF0 with different meaning) */
+        /* Actually, state is just up/down indicator */
+        
+        /* Handle shift key press */
+        if (raw.key == 0x12 || raw.key == 0x59) {
+            /* Left or right shift pressed */
+            shift_pressed = 1;
+            continue;
+        }
+        
+        /* Check for special keys first */
+        if (raw.key == 0x5A) {
+            /* Enter - submit */
+            shift_pressed = 0;
+            scr_printf("\n");
+            return (pos > 0) ? 1 : 0;
+        }
+        
+        if (raw.key == 0x66) {
+            /* Backspace */
+            if (pos > 0) {
+                pos--;
+                buffer[pos] = '\0';
+                scr_printf("\b \b");
+            }
+            continue;
+        }
+        
+        if (raw.key == 0x0F) {
+            /* TAB */
+            shift_pressed = 0;
+            return 2;  /* Special code for TAB */
+        }
+        
+        if (raw.key == 0x76) {
+            /* Escape */
+            shift_pressed = 0;
+            return -1;  /* Special code for Escape */
+        }
+        
+        /* Check for number keys 1-5 (quick select) */
+        if (raw.key >= 0x16 && raw.key <= 0x2E) {
+            int num = 0;
+            if (raw.key == 0x16) num = 1;
+            else if (raw.key == 0x1E) num = 2;
+            else if (raw.key == 0x26) num = 3;
+            else if (raw.key == 0x25) num = 4;
+            else if (raw.key == 0x2E) num = 5;
+            if (num >= 1 && num <= 5) {
+                shift_pressed = 0;
+                return 10 + num;  /* Return 11-15 for 1-5 */
+            }
+        }
+        
+        /* Convert keycode to ASCII */
+        char c = keycode_to_ascii(raw.key, shift_pressed);
+        
+        if (c && pos < max_len - 1) {
+            /* Handle special keys that return special codes */
+            if ((unsigned char)c == 0x08) {
+                /* Backspace */
+                if (pos > 0) {
+                    pos--;
+                    buffer[pos] = '\0';
+                    scr_printf("\b \b");
+                }
+            } else if ((unsigned char)c == 0x0D) {
+                /* Enter */
+                shift_pressed = 0;
+                scr_printf("\n");
+                return (pos > 0) ? 1 : 0;
+            } else if ((unsigned char)c == 0x09) {
+                /* TAB */
+                shift_pressed = 0;
+                return 2;
+            } else if ((unsigned char)c == 0x1B) {
+                /* Escape */
+                shift_pressed = 0;
+                return -1;
+            } else {
+                /* Regular character */
+                buffer[pos++] = c;
+                buffer[pos] = '\0';
+                scr_printf("%c", c);
+            }
+        }
+    }
+}
+
 /* Main program */
 int main(int argc, char *argv[]) {
     char prompt[MAX_PROMPT];
@@ -605,6 +772,14 @@ int main(int argc, char *argv[]) {
     /* Initialize debug screen */
     init_scr();
     scr_setCursor(0);
+    
+    /* Initialize USB keyboard */
+    int kbd_result = PS2KbdInit();
+    if (kbd_result < 0) {
+        scr_printf("[KBD] Warning: USB keyboard not found, using serial input\n");
+    } else {
+        scr_printf("[KBD] USB keyboard initialized (key codes: TAB=0x0F, ESC=0x76, 1-5=quick-select)\n");
+    }
     
     /* Move text down a bit */
     scr_printf("\n\n\n\n\n\n\n\n");
@@ -658,18 +833,22 @@ int main(int argc, char *argv[]) {
         /* Clear prompt buffer */
         memset(prompt, 0, sizeof(prompt));
         
-        /* Read input - use fgets */
-        if (fgets(prompt, sizeof(prompt), stdin) == NULL) {
-            /* EOF or error */
-            ps2_sleep(100);
-            continue;
+        /* Read input using keyboard */
+        int input_result = read_kbd_line(prompt, sizeof(prompt));
+        
+        /* Handle special keyboard input */
+        if (input_result == -1) {
+            /* Escape - exit */
+            scr_printf("\n");
+            print_border();
+            scr_printf("| Session terminated.                          |\n");
+            scr_printf("| -=[ PS2CLAW ]=-                              |\n");
+            print_border();
+            ps2_sleep(2000);
+            break;
         }
         
-        /* Remove newline */
-        prompt[strcspn(prompt, "\n")] = 0;
-        
-        /* Check for special keys - TAB or number keys */
-        if (prompt[0] == '\t') {
+        if (input_result == 2) {
             /* TAB - cycle provider */
             cycle_provider();
             cp = get_current_provider();
@@ -692,9 +871,9 @@ int main(int argc, char *argv[]) {
             continue;
         }
         
-        /* Check for number key (1-5) to select provider */
-        if (prompt[0] >= '1' && prompt[0] <= '5' && prompt[1] == '\0') {
-            int idx = prompt[0] - '1';
+        if (input_result >= 11 && input_result <= 15) {
+            /* Number key 1-5 - select provider */
+            int idx = input_result - 11;
             if (select_provider(idx) == 0) {
                 cp = get_current_provider();
                 scr_printf("[CFG] Switched to: %s\n", cp->name);
@@ -713,13 +892,13 @@ int main(int argc, char *argv[]) {
             continue;
         }
         
-        /* Skip empty input */
-        if (strlen(prompt) == 0) {
+        if (input_result == 0) {
+            /* Empty input */
             ps2_sleep(100);
             continue;
         }
         
-        /* Check for quit */
+        /* Check for quit (user typed "quit" or pressed Escape) */
         if (strcmp(prompt, "quit") == 0 || strcmp(prompt, "exit") == 0) {
             scr_printf("\n");
             print_border();
@@ -810,6 +989,9 @@ int main(int argc, char *argv[]) {
         /* Show prompt again */
         scr_printf("\x1b[36m[ AWAITING INPUT ]\x1b[0m\n");
     }
+    
+    /* Cleanup keyboard */
+    PS2KbdClose();
     
     return 0;
 }
