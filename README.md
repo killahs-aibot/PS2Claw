@@ -51,6 +51,21 @@ Get a free key at: https://openrouter.ai
 - `model` - Model to use (default: `google/gemini-3.1-flash-lite-preview`)
 - `demo_mode` - Set to `true` for offline demo responses
 
+### Chat Logs
+
+Chat logs are saved to USB at: `mass:/PS2CLAW/chatlog.txt`
+
+Format:
+```
+[Tue Mar 17 04:08:00 2026]
+YOU: Hello
+PS2CLAW: Greetings, survivor...
+
+[Wed Mar 18 10:15:00 2026]
+YOU: What's the weather?
+PS2CLAW: The geigers are clicking, but skies are clear...
+```
+
 Enjoy 🤖
 
 ### Set Up Network

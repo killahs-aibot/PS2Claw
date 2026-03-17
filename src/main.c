@@ -83,6 +83,23 @@ static void load_config(char *api_key, size_t api_len, char *model, size_t model
     fclose(fp);
 }
 
+/* Chat log to USB */
+#define CHAT_LOG_FILE "mass:/PS2CLAW/chatlog.txt"
+
+static void save_chat_log(const char *prompt, const char *response) {
+    FILE *fp = fopen(CHAT_LOG_FILE, "a");
+    if (!fp) return;
+    
+    time_t now = time(NULL);
+    char *ts = ctime(&now);
+    ts[strlen(ts)-1] = '\0';  /* Remove newline */
+    
+    fprintf(fp, "[%s]\n", ts);
+    fprintf(fp, "YOU: %s\n", prompt);
+    fprintf(fp, "PS2CLAW: %s\n\n", response);
+    fclose(fp);
+}
+
 /* Response buffer */
 typedef struct {
     char *data;
@@ -400,6 +417,8 @@ int main(int argc, char *argv[]) {
             print_border();
             scr_printf("%s\n", demo_responses[demo_index]);
             print_border();
+            /* Save to USB chat log */
+            save_chat_log(prompt, demo_responses[demo_index]);
             demo_index = (demo_index + 1) % DEMO_RESPONSES;
         } else {
             /* Online mode */
@@ -407,6 +426,8 @@ int main(int argc, char *argv[]) {
                 print_border();
                 scr_printf("%s\n", response);
                 print_border();
+                /* Save to USB chat log */
+                save_chat_log(prompt, response);
             } else {
                 print_border();
                 scr_printf("| [ERROR] Request failed - network issue?    |\n");
