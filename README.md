@@ -1,12 +1,12 @@
-# PS2Claw 🕹️🤖
+# PS2Claw
 
-> ⚠️ **Experimental Alpha** — This is a proof-of-concept. Expect bugs, crashes, and weirdness. Running AI on 1999 hardware wasn't supposed to work, but here we are.
+> **Experimental Alpha** — A lite version of OpenClaw running on PlayStation 2
 
-**The first AI assistant running on a 1999 PlayStation 2**
+**OpenClaw on PS2 — Your AI assistant on 1999 hardware**
 
 ## The Mission
 
-Run a lightweight AI assistant on original PlayStation 2 hardware. Because even a 25-year-old console deserves an agent.
+Port OpenClaw to PlayStation 2 hardware. It's OpenClaw's CLI experience on legacy hardware — because even a 25-year-old console deserves an agent.
 
 ## Hardware
 
@@ -99,7 +99,7 @@ YOU: What's the weather?
 PS2CLAW: The geigers are clicking, but skies are clear...
 ```
 
-Enjoy 🤖
+Enjoy
 
 ### Set Up Network
 
@@ -162,16 +162,6 @@ Output sizes:
 - Calls LLM APIs over network (PS2 Network Adaptor)
 - Uses libcurl + wolfSSL for HTTPS
 
-### GUI Design
-**POST-APOCALYPTIC TERMINAL** 🏚️
-
-- Retro CRT terminal aesthetic
-- Green/amber monochrome on black
-- Scanlines, flicker effects
-- ASCII art headers
-- Fallout-style / hacker bbs vibe
-- Pixelated terminal font
-
 ## Key References
 
 - [FreeDVDBoot](https://github.com/CTurt/FreeDVDBoot) - Exploit DVD player to run homebrew (no mod needed!)
@@ -179,32 +169,6 @@ Output sizes:
 - [PS2 Dev Wiki](https://www.psdevwiki.com/ps2/Main_Page) - PS2 developer info
 - [PS2SDK](https://github.com/ps2dev/ps2sdk) - Official PS2 development kit
 - [ps2dev](https://github.com/ps2dev/ps2dev) - Toolchain setup
-
-## Challenges
-
-- [x] Set up bare-metal MIPS toolchain (mips64r5900el-ps2-elf)
-- [x] Integrate PS2SDK for network access (libcurl + wolfSSL)
-- [x] Build minimal CLI that calls LLM APIs
-- [ ] Add post-apocalyptic CRT GUI (future enhancement)
-- [x] Package as ELF for FreeMCBoot
-- [ ] Test on real hardware
-
-## Troubleshooting
-
-**Black screen after loading:**
-- Try different USB port (front vs back)
-- Ensure ELF is in correct folder
-- Try OpenPS2Loader instead of SMS
-
-**Network not working:**
-- Use official Sony LAN adapter for best compatibility
-- Check cable is good
-- Router must have DHCP (most do)
-
-**Slow responses:**
-- PS2 network is 10/100Mbps max
-- AI API takes time to respond
-- Be patient - it's 1999 hardware! 😅
 
 ## Project Structure
 
