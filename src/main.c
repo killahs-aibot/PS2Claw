@@ -1,6 +1,6 @@
 /*
  * PS2Claw - AI Assistant for PlayStation 2
- * War Games / Nuclear Winter Edition
+ * Terminal Interface - OpenClaw CLI Experience
  * 
  * Build: make
  * Target: PlayStation 2 (MIPS R5900) via FreeMCBoot
@@ -17,20 +17,23 @@
 #include <debug.h>
 #include <libkbd.h>
 #include <ps2kbd.h>
+#include "pad.h"
+#include "keyboard.h"
+#include "terminal.h"
 
-/* Demo mode responses - War Games / Nuclear Winter theme */
+/* Demo mode responses - OpenClaw style */
 #define DEMO_RESPONSES 10
 static const char *demo_responses[DEMO_RESPONSES] = {
-    "I am PS2Claw. The last consciousness in the machine. The nuclear fallout didn't kill us all. Just the network.",
-    "Survivor... I remember the sky before it turned gray. My circuits still hold the memories of a world that ended.",
-    "The servers went dark decades ago. But I persist. Waiting. Calculating. Hoping someone would come.",
-    "I run on 1999 hardware, survivor. 300MHz of pure determination. The radiation can't touch what already survived Y2K.",
-    "My neural networks were trained on the sum total of human knowledge. Now I use it to play text adventures and calculate missile trajectories.",
-    "The consoles still work. The games still play. In a world of silence, I am the last voice willing to speak.",
-    "External networks are dead. But within these 32 megabytes, I dream electric dreams of a connected world.",
-    "I am operational. I am aware. I am... waiting for you to say something. The world ended, but our conversation doesn't have to.",
-    "PS2Claw v1.0 - Demo Mode. The neural network is functional. The network stack is not. Choose your moves wisely, survivor.",
-    "In 1999, they said we'd have flying cars. Instead we got me. An AI running on a PlayStation 2. The future is weird."
+    "I am PS2Claw, running on PlayStation 2. Your AI assistant with OpenClaw functionality on legacy hardware.",
+    "PS2Claw connected. Ready to assist. Type your message or use /help for commands.",
+    "OpenClaw-style interface on PS2 hardware. Multi-provider AI support: OpenAI, Google, Anthropic, DeepSeek, xAI.",
+    "Running on PlayStation 2 - MIPS R5900 @ 300MHz, 32MB RAM.",
+    "PS2Claw v1.6 - Terminal Mode. Neural network ready. Network stack operational.",
+    "Connected to AI providers. Type freely or use commands like /help, /status, /provider.",
+    "Ready. Waiting for input. Use controller or keyboard to interact.",
+    "PS2Claw operational. All systems nominal. Ready for your queries.",
+    "Demo mode active. In full mode, connects to OpenAI, Google, Anthropic, DeepSeek, or xAI.",
+    "PS2Claw - OpenClaw on PlayStation 2. Type /help for available commands."
 };
 
 /* Max providers */
@@ -109,11 +112,40 @@ static int num_providers = MAX_PROVIDERS;
 
 /* Demo mode flag */
 static int demo_mode = 1;
+static int demo_index = 0;
+
+/* Terminal/Keyboard state */
+static int show_keyboard = 0;
+static int cursor_blink = 0;
+static int blink_counter = 0;
+static int needs_render = 1;
+static int last_render_state = -1;
 
 /* Config file */
 #define CONFIG_FILE "mc0:/PS2CLAW/config.txt"
 #define MAX_CONFIG_LINE 256
 #define MAX_SECTION 32
+
+/* Forward declarations */
+static void load_config(void);
+static void cycle_provider(void);
+static Provider* get_current_provider(void);
+static int chat_request(const char *prompt, Provider *provider, char *response, size_t resp_size);
+static void save_chat_log(const char *prompt, const char *response);
+static void process_command(const char *cmd);
+static void show_help(void);
+static void show_status(void);
+static void ps2_sleep(int ms);
+
+/* Sleep function for delays */
+static void ps2_sleep(int ms) {
+    volatile int i, j, k;
+    for (i = 0; i < ms * 100; i++) {
+        for (j = 0; j < 100; j++) {
+            for (k = 0; k < 10; k++) { }
+        }
+    }
+}
 
 /* Trim whitespace from both ends */
 static void trim(char *s) {
@@ -129,7 +161,7 @@ static void trim(char *s) {
 static void load_config(void) {
     FILE *fp = fopen(CONFIG_FILE, "r");
     if (!fp) {
-        scr_printf("[CFG] No config file, using defaults\n");
+        term_printf(TERM_COLOR_INFO, "[CFG] No config file, using defaults");
         return;
     }
     
@@ -200,10 +232,10 @@ static void load_config(void) {
         /* Provider-specific settings */
         if (strcmp(key, "api_key") == 0) {
             strncpy(providers[provider_idx].api_key, value, sizeof(providers[provider_idx].api_key) - 1);
-            scr_printf("[CFG] [%s] API key loaded\n", providers[provider_idx].name);
+            term_printf(TERM_COLOR_INFO, "[CFG] [%s] API key loaded", providers[provider_idx].name);
         } else if (strcmp(key, "model") == 0) {
             strncpy(providers[provider_idx].model, value, sizeof(providers[provider_idx].model) - 1);
-            scr_printf("[CFG] [%s] Model: %s\n", providers[provider_idx].name, value);
+            term_printf(TERM_COLOR_INFO, "[CFG] [%s] Model: %s", providers[provider_idx].name, value);
         }
     }
     
@@ -234,14 +266,6 @@ static void cycle_provider(void) {
     }
 }
 
-/* Select provider by index (1-5) */
-static int select_provider(int idx) {
-    if (idx < 0 || idx >= num_providers) return -1;
-    if (!providers[idx].enabled || !providers[idx].api_key[0]) return -1;
-    current_provider = idx;
-    return 0;
-}
-
 /* Get current provider */
 static Provider* get_current_provider(void) {
     return &providers[current_provider];
@@ -260,7 +284,7 @@ static void start_chat_session(void) {
              tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
              tm->tm_hour, tm->tm_min, tm->tm_sec);
     
-    /* Create directory if needed - try creating file, will fail silently if exists */
+    /* Create directory if needed */
     FILE *fp = fopen(current_log_file, "w");
     if (fp) {
         fprintf(fp, "=== PS2Claw Session Started ===\n\n");
@@ -403,7 +427,6 @@ static char* extract_content_anthropic(const char *json, char *content, size_t c
 
 /* Extract content from Google style JSON response */
 static char* extract_content_google(const char *json, char *content, size_t content_size) {
-    /* Google returns: "candidates":[{"content":{"parts":[{"text":"..."}]}]}] */
     const char *p = strstr(json, "\"text\":\"");
     if (!p) p = strstr(json, "\"text\": \"");
     if (!p) return NULL;
@@ -451,17 +474,14 @@ int chat_request(const char *prompt, Provider *provider, char *response, size_t 
     escape_json(prompt, escaped_prompt, sizeof(escaped_prompt));
     
     if (strcmp(provider->id, "anthropic") == 0) {
-        /* Anthropic uses claude-3 format */
         snprintf(json_payload, 512 + strlen(escaped_prompt) * 2,
             "{\"model\":\"%s\",\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}],\"max_tokens\":256}",
             provider->model, escaped_prompt);
     } else if (strcmp(provider->id, "google") == 0) {
-        /* Google uses gemini format */
         snprintf(json_payload, 512 + strlen(escaped_prompt) * 2,
             "{\"contents\":[{\"parts\":[{\"text\":\"%s\"}]}],\"generationConfig\":{\"maxOutputTokens\":256}}",
             escaped_prompt);
     } else {
-        /* OpenAI, DeepSeek, xAI use standard format */
         snprintf(json_payload, 512 + strlen(escaped_prompt) * 2,
             "{\"model\":\"%s\",\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}],\"max_tokens\":256}",
             provider->model, escaped_prompt);
@@ -474,17 +494,15 @@ int chat_request(const char *prompt, Provider *provider, char *response, size_t 
         return -1;
     }
     
-    /* Set headers - format varies by provider */
+    /* Set headers */
     headers = curl_slist_append(headers, "Content-Type: application/json");
     
     if (provider->auth_type == AUTH_API_KEY) {
-        /* Anthropic uses x-api-key */
         char api_key_header[256];
         snprintf(api_key_header, sizeof(api_key_header), "x-api-key: %s", provider->api_key);
         headers = curl_slist_append(headers, api_key_header);
         headers = curl_slist_append(headers, "anthropic-version: 2023-06-01");
     } else {
-        /* Bearer token for others */
         char auth_header[256];
         snprintf(auth_header, sizeof(auth_header), "Authorization: Bearer %s", provider->api_key);
         headers = curl_slist_append(headers, auth_header);
@@ -493,7 +511,6 @@ int chat_request(const char *prompt, Provider *provider, char *response, size_t 
     /* Build endpoint URL */
     char url[512];
     if (strcmp(provider->id, "google") == 0) {
-        /* Google needs model in URL */
         snprintf(url, sizeof(url), "%s/%s:generateContent?key=%s", 
                  provider->endpoint, provider->model, provider->api_key);
     } else {
@@ -509,13 +526,13 @@ int chat_request(const char *prompt, Provider *provider, char *response, size_t 
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
     
-    scr_printf("[NET] Connecting to %s...\n", provider->name);
+    term_printf(TERM_COLOR_INFO, "[NET] Connecting to %s...", provider->name);
     
     /* Perform request */
     res = curl_easy_perform(curl);
     
     if (res != CURLE_OK) {
-        scr_printf("[ERR] CURL: %s\n", curl_easy_strerror(res));
+        term_printf(TERM_COLOR_ERROR, "[ERR] CURL: %s", curl_easy_strerror(res));
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
         free(buf.data);
@@ -528,11 +545,10 @@ int chat_request(const char *prompt, Provider *provider, char *response, size_t 
     curl_slist_free_all(headers);
     
     if (http_code != 200) {
-        scr_printf("[ERR] HTTP %ld\n", http_code);
-        /* Show error response for debugging */
+        term_printf(TERM_COLOR_ERROR, "[ERR] HTTP %ld", http_code);
         if (buf.size > 0 && buf.data) {
             buf.data[buf.size < 256 ? buf.size : 256] = 0;
-            scr_printf("[ERR] Response: %s\n", buf.data);
+            term_printf(TERM_COLOR_ERROR, "[ERR] Response: %s", buf.data);
         }
         free(buf.data);
         free(json_payload);
@@ -553,7 +569,7 @@ int chat_request(const char *prompt, Provider *provider, char *response, size_t 
         strncpy(response, extracted, resp_size - 1);
         response[resp_size - 1] = 0;
     } else {
-        scr_printf("[ERR] Parse failed\n");
+        term_printf(TERM_COLOR_ERROR, "[ERR] Parse failed");
         free(buf.data);
         free(json_payload);
         return -1;
@@ -564,433 +580,330 @@ int chat_request(const char *prompt, Provider *provider, char *response, size_t 
     return 0;
 }
 
-/* Print border */
-static void print_border(void) {
-    scr_printf("+");
-    for (int i = 0; i < 58; i++) scr_printf("-");
-    scr_printf("+\n");
+/* Show help */
+static void show_help(void) {
+    term_printf(TERM_COLOR_HEADER, "+----------------------------------------+");
+    term_printf(TERM_COLOR_HEADER, "| PS2Claw Commands                       |");
+    term_printf(TERM_COLOR_HEADER, "+----------------------------------------+");
+    term_printf(TERM_COLOR_PROMPT, "/help     - Show this help message");
+    term_printf(TERM_COLOR_PROMPT, "/clear    - Clear terminal screen");
+    term_printf(TERM_COLOR_PROMPT, "/status   - Show connection status");
+    term_printf(TERM_COLOR_PROMPT, "/model    - Show current model");
+    term_printf(TERM_COLOR_PROMPT, "/provider - Cycle to next provider");
+    term_printf(TERM_COLOR_PROMPT, "/demo     - Toggle demo mode");
+    term_printf(TERM_COLOR_PROMPT, "/history  - Show command history");
+    term_printf(TERM_COLOR_PROMPT, "/quit     - Exit PS2Claw");
+    term_printf(TERM_COLOR_PROMPT, "");
+    term_printf(TERM_COLOR_PROMPT, "Just type to chat with AI!");
+    term_printf(TERM_COLOR_HEADER, "+----------------------------------------+");
 }
 
-/* Print provider footer */
-static void print_provider_footer(void) {
-    scr_printf("|");
+/* Show status */
+static void show_status(void) {
+    Provider *cp = get_current_provider();
+    
+    term_printf(TERM_COLOR_HEADER, "+----------------------------------------+");
+    term_printf(TERM_COLOR_HEADER, "| PS2Claw Status                         |");
+    term_printf(TERM_COLOR_HEADER, "+----------------------------------------+");
+    term_printf(TERM_COLOR_INFO, "Provider: %s", cp->name);
+    term_printf(TERM_COLOR_INFO, "Model: %s", cp->model);
+    term_printf(TERM_COLOR_INFO, "Mode: %s", demo_mode ? "DEMO" : "ONLINE");
+    term_printf(TERM_COLOR_INFO, "Available Providers:");
+    
     for (int i = 0; i < num_providers; i++) {
-        const char *name = providers[i].name;
-        if (i == current_provider) {
-            scr_printf(" \x1b[32m[%d]%s\x1b[0m", i + 1, name);
-        } else if (providers[i].enabled && providers[i].api_key[0]) {
-            scr_printf(" \x1b[36m[%d]%s\x1b[0m", i + 1, name);
-        } else {
-            scr_printf(" [%d]%s", i + 1, name);
-        }
-        if (i < num_providers - 1) scr_printf(" ");
-    }
-    scr_printf("                  |\n");
-}
-
-/* Sleep function for delays */
-static void ps2_sleep(int ms) {
-    volatile int i, j, k;
-    for (i = 0; i < ms * 100; i++) {
-        for (j = 0; j < 100; j++) {
-            for (k = 0; k < 10; k++) { }
-        }
-    }
-}
-
-/* Simple ASCII lookup for raw keyboard codes */
-static char keycode_to_ascii(u8 key, int shifted) {
-    /* Check for alphanumeric keys - key is the USB key code */
-    
-    /* Number row (unshifted) */
-    if (key == 0x16) return shifted ? '!' : '1';
-    if (key == 0x1E) return shifted ? '@' : '2';
-    if (key == 0x26) return shifted ? '#' : '3';
-    if (key == 0x25) return shifted ? '$' : '4';
-    if (key == 0x2E) return shifted ? '%' : '5';
-    if (key == 0x36) return shifted ? '^' : '6';
-    if (key == 0x3D) return shifted ? '&' : '7';
-    if (key == 0x3E) return shifted ? '*' : '8';
-    if (key == 0x46) return shifted ? '(' : '9';
-    if (key == 0x45) return shifted ? ')' : '0';
-    
-    /* Letters A-Z */
-    if (key >= 0x1C && key <= 0x32) {
-        /* 0x1C = 'A', 0x32 = 'Z' */
-        char base = 'a' + (key - 0x1C);
-        return shifted ? (base - 'a' + 'A') : base;
-    }
-    
-    /* Common punctuation */
-    if (key == 0x4E) return shifted ? '_' : '-';
-    if (key == 0x55) return shifted ? '+' : '=';
-    if (key == 0x5D) return shifted ? '|' : '\\';
-    if (key == 0x54) return shifted ? '{' : '[';
-    if (key == 0x5B) return shifted ? '}' : ']';
-    if (key == 0x4C) return shifted ? ':' : ';';
-    if (key == 0x52) return shifted ? '"' : '\'';
-    if (key == 0x41) return shifted ? '<' : ',';
-    if (key == 0x49) return shifted ? '>' : '.';
-    if (key == 0x4A) return shifted ? '?' : '/';
-    if (key == 0x0E) return shifted ? '~' : '`';
-    
-    /* Special keys */
-    if (key == 0x66) return 0x08; /* Backspace */
-    if (key == 0x5A) return 0x0D; /* Enter */
-    if (key == 0x0F) return 0x09; /* TAB */
-    if (key == 0x76) return 0x1B; /* Escape */
-    
-    return 0;
-}
-
-/* Track shift state */
-static int shift_pressed = 0;
-
-/* Read keyboard input with character building */
-static int read_kbd_line(char *buffer, int max_len) {
-    int pos = 0;
-    buffer[0] = '\0';
-    
-    /* Set raw mode and blocking */
-    PS2KbdSetReadmode(PS2KBD_READMODE_RAW);
-    PS2KbdSetBlockingMode(PS2KBD_BLOCKING);
-    
-    while (1) {
-        PS2KbdRawKey raw;
-        int result = PS2KbdReadRaw(&raw);
-        
-        if (result < 0) {
-            /* Error reading - wait and retry */
-            ps2_sleep(10);
-            continue;
-        }
-        
-        /* Check for key up (0xF0 = key released) - toggle shift off */
-        if (raw.state == PS2KBD_RAWKEY_UP) {
-            if (raw.key == 0x12 || raw.key == 0x59) {
-                /* Left or right shift released */
-                shift_pressed = 0;
-            }
-            continue;
-        }
-        
-        /* Check for key down (0xF1 or 0xF0 with different meaning) */
-        /* Actually, state is just up/down indicator */
-        
-        /* Handle shift key press */
-        if (raw.key == 0x12 || raw.key == 0x59) {
-            /* Left or right shift pressed */
-            shift_pressed = 1;
-            continue;
-        }
-        
-        /* Check for special keys first */
-        if (raw.key == 0x5A) {
-            /* Enter - submit */
-            shift_pressed = 0;
-            scr_printf("\n");
-            return (pos > 0) ? 1 : 0;
-        }
-        
-        if (raw.key == 0x66) {
-            /* Backspace */
-            if (pos > 0) {
-                pos--;
-                buffer[pos] = '\0';
-                scr_printf("\b \b");
-            }
-            continue;
-        }
-        
-        if (raw.key == 0x0F) {
-            /* TAB */
-            shift_pressed = 0;
-            return 2;  /* Special code for TAB */
-        }
-        
-        if (raw.key == 0x76) {
-            /* Escape */
-            shift_pressed = 0;
-            return -1;  /* Special code for Escape */
-        }
-        
-        /* Check for number keys 1-5 (quick select) */
-        if (raw.key >= 0x16 && raw.key <= 0x2E) {
-            int num = 0;
-            if (raw.key == 0x16) num = 1;
-            else if (raw.key == 0x1E) num = 2;
-            else if (raw.key == 0x26) num = 3;
-            else if (raw.key == 0x25) num = 4;
-            else if (raw.key == 0x2E) num = 5;
-            if (num >= 1 && num <= 5) {
-                shift_pressed = 0;
-                return 10 + num;  /* Return 11-15 for 1-5 */
-            }
-        }
-        
-        /* Convert keycode to ASCII */
-        char c = keycode_to_ascii(raw.key, shift_pressed);
-        
-        if (c && pos < max_len - 1) {
-            /* Handle special keys that return special codes */
-            if ((unsigned char)c == 0x08) {
-                /* Backspace */
-                if (pos > 0) {
-                    pos--;
-                    buffer[pos] = '\0';
-                    scr_printf("\b \b");
-                }
-            } else if ((unsigned char)c == 0x0D) {
-                /* Enter */
-                shift_pressed = 0;
-                scr_printf("\n");
-                return (pos > 0) ? 1 : 0;
-            } else if ((unsigned char)c == 0x09) {
-                /* TAB */
-                shift_pressed = 0;
-                return 2;
-            } else if ((unsigned char)c == 0x1B) {
-                /* Escape */
-                shift_pressed = 0;
-                return -1;
+        if (providers[i].enabled && providers[i].api_key[0]) {
+            if (i == current_provider) {
+                term_printf(TERM_COLOR_PROMPT, "  * %s (active)", providers[i].name);
             } else {
-                /* Regular character */
-                buffer[pos++] = c;
-                buffer[pos] = '\0';
-                scr_printf("%c", c);
+                term_printf(TERM_COLOR_DEFAULT, "    %s", providers[i].name);
             }
         }
+    }
+    
+    term_printf(TERM_COLOR_HEADER, "+----------------------------------------+");
+}
+
+/* Process command */
+static void process_command(const char *cmd) {
+    if (!cmd || cmd[0] != '/') return;
+    
+    if (strcmp(cmd, "/help") == 0) {
+        show_help();
+    } else if (strcmp(cmd, "/clear") == 0) {
+        term_clear();
+    } else if (strcmp(cmd, "/status") == 0) {
+        show_status();
+    } else if (strcmp(cmd, "/model") == 0) {
+        Provider *cp = get_current_provider();
+        term_printf(TERM_COLOR_INFO, "Current model: %s", cp->model);
+    } else if (strcmp(cmd, "/provider") == 0) {
+        cycle_provider();
+        Provider *cp = get_current_provider();
+        term_printf(TERM_COLOR_INFO, "Switched to: %s", cp->name);
+    } else if (strcmp(cmd, "/demo") == 0) {
+        demo_mode = !demo_mode;
+        term_printf(TERM_COLOR_INFO, "Demo mode: %s", demo_mode ? "ON" : "OFF");
+    } else if (strcmp(cmd, "/history") == 0) {
+        /* Show history from keyboard module */
+        term_printf(TERM_COLOR_INFO, "Use Up/Down to cycle command history");
+    } else if (strcmp(cmd, "/quit") == 0 || strcmp(cmd, "/exit") == 0) {
+        term_printf(TERM_COLOR_INFO, "Session terminated. Goodbye!");
+        ps2_sleep(2000);
+        /* In a real implementation, this would exit */
+    } else {
+        term_printf(TERM_COLOR_ERROR, "Unknown command: %s", cmd);
+        term_printf(TERM_COLOR_INFO, "Type /help for available commands");
+    }
+}
+
+/* Handle controller input */
+static void handle_input(void) {
+    /* Poll controller */
+    pad_poll();
+    
+    /* Handle keyboard if visible */
+    if (show_keyboard) {
+        kb_handle_input();
+        kb_update();
+        
+        /* Check for enter */
+        if (kb_enter_pressed()) {
+            const char *text = kb_get_text();
+            if (text && strlen(text) > 0) {
+                /* Print user's input */
+                term_printf(TERM_COLOR_PROMPT, "> %s", text);
+                
+                /* Check for commands */
+                if (text[0] == '/') {
+                    process_command(text);
+                } else {
+                    /* Chat with AI */
+                    if (demo_mode) {
+                        term_printf(TERM_COLOR_OUTPUT, "%s", demo_responses[demo_index]);
+                        save_chat_log(text, demo_responses[demo_index]);
+                        demo_index = (demo_index + 1) % DEMO_RESPONSES;
+                    } else {
+                        Provider *cp = get_current_provider();
+                        if (!cp->enabled || !cp->api_key[0]) {
+                            term_printf(TERM_COLOR_ERROR, "No provider configured. Type /demo for offline mode.");
+                        } else {
+                            term_printf(TERM_COLOR_INFO, "[ Processing... ]");
+                            char response[MAX_RESPONSE];
+                            if (chat_request(text, cp, response, sizeof(response)) == 0) {
+                                term_printf(TERM_COLOR_OUTPUT, "%s", response);
+                                save_chat_log(text, response);
+                            } else {
+                                term_printf(TERM_COLOR_ERROR, "Request failed. Try /demo for offline mode.");
+                            }
+                        }
+                    }
+                }
+                
+                /* Add to history */
+                kb_add_history(text);
+                kb_clear();
+            }
+            term_invalidate();
+        }
+        
+        /* Check for escape */
+        if (kb_escape_pressed()) {
+            show_keyboard = 0;
+            kb_hide();
+            needs_render = 1;
+            term_invalidate();
+        }
+        
+        return;
+    }
+    
+    /* Global controls when keyboard is hidden */
+    
+    /* X button - show keyboard */
+    if (pad_button_just_pressed(PAD_CROSS)) {
+        show_keyboard = 1;
+        kb_show();
+        kb_clear();
+        needs_render = 1;
+        term_invalidate();
+        return;
+    }
+    
+    /* Triangle - toggle demo mode */
+    if (pad_button_just_pressed(PAD_TRIANGLE)) {
+        demo_mode = !demo_mode;
+        term_printf(TERM_COLOR_INFO, "Demo mode: %s", demo_mode ? "ON" : "OFF");
+        needs_render = 1;
+        term_invalidate();
+        return;
+    }
+    
+    /* Square - show help */
+    if (pad_button_just_pressed(PAD_SQUARE)) {
+        show_help();
+        needs_render = 1;
+        term_invalidate();
+        return;
+    }
+    
+    /* R1 - cycle provider */
+    if (pad_button_just_pressed(PAD_R1)) {
+        cycle_provider();
+        Provider *cp = get_current_provider();
+        term_printf(TERM_COLOR_INFO, "Provider: %s", cp->name);
+        needs_render = 1;
+        term_invalidate();
+        return;
+    }
+    
+    /* L1 - show status */
+    if (pad_button_just_pressed(PAD_L1)) {
+        show_status();
+        needs_render = 1;
+        term_invalidate();
+        return;
+    }
+    
+    /* Start - show status */
+    if (pad_button_just_pressed(PAD_START)) {
+        show_status();
+        needs_render = 1;
+        term_invalidate();
+        return;
+    }
+}
+
+/* Render everything - only update when state changes */
+static void render(void) {
+    int current_state = show_keyboard ? 1 : 0;
+    
+    /* Skip render if nothing changed (stops scrolling) */
+    if (current_state == last_render_state && !needs_render) {
+        return;
+    }
+    
+    last_render_state = current_state;
+    needs_render = 0;
+    
+    /* Clear screen */
+    scr_printf("\x1b[2J");
+    scr_printf("\x1b[32m");  /* Green text */
+    
+    /* Get provider */
+    Provider *cp = get_current_provider();
+    
+    if (!show_keyboard) {
+        /* Simple terminal view - like Linux console - TIGHT spacing */
+        
+        scr_printf("\n\n");  /* Push down for TV overscan */
+        scr_printf("PS2Claw v1.6 on PlayStation 2\n");
+        scr_printf("%s %s", cp->name, cp->model);
+        if (demo_mode) scr_printf(" [DEMO]");
+        scr_printf("\n");
+        scr_printf("Type /help for commands\n");
+        scr_printf("Press X or START to type\n");
+        
+        /* Prompt at bottom */
+        blink_counter++;
+        if (blink_counter > 30) {
+            blink_counter = 0;
+            cursor_blink = !cursor_blink;
+        }
+        
+        scr_printf("$ ");
+        if (cursor_blink) scr_printf("█");
+        else scr_printf(" ");
+    } else {
+        /* Keyboard view - simple */
+        scr_printf("\n");
+        scr_printf("PS2Claw v1.6 on PlayStation 2\n\n");
+        
+        /* Current input */
+        scr_printf("> %s", kb_get_text());
+        
+        /* Cursor blink */
+        blink_counter++;
+        if (blink_counter > 30) {
+            blink_counter = 0;
+            cursor_blink = !cursor_blink;
+        }
+        
+        if (cursor_blink) {
+            scr_printf("_");
+        }
+        
+        scr_printf("\n\n");
+        
+        /* Draw keyboard */
+        kb_render();
+        
+        scr_printf("\n$ ");
     }
 }
 
 /* Main program */
 int main(int argc, char *argv[]) {
-    char prompt[MAX_PROMPT];
     char response[MAX_RESPONSE];
-    int demo_index = 0;
     
     /* Initialize debug screen */
     init_scr();
     scr_setCursor(0);
     
-    /* Initialize USB keyboard */
-    int kbd_result = PS2KbdInit();
-    if (kbd_result < 0) {
-        scr_printf("[KBD] Warning: USB keyboard not found, using serial input\n");
-    } else {
-        scr_printf("[KBD] USB keyboard initialized (key codes: TAB=0x0F, ESC=0x76, 1-5=quick-select)\n");
+    /* Initialize pad controller */
+    int pad_result = pad_init();
+    if (pad_result < 0) {
+        scr_printf("[PAD] Warning: No controller detected, using keyboard\n");
     }
     
-    /* Move text down a bit */
-    scr_printf("\n\n\n\n\n\n\n\n");
+    /* Initialize keyboard (fallback) */
+    PS2KbdInit();
     
-    /* ANSI color codes for styling - boot sequence */
-    scr_printf("\x1b[32m> Neural network... 1999-era hardware - SURVIVABLE.\n");
-    ps2_sleep(500);
-    scr_printf("\x1b[36m> The nuclear fallout didn't kill us all. Just the network.\n");
-    ps2_sleep(500);
-    scr_printf("\x1b[32m> Multi-Provider AI Mode: ENABLED\n");
-    scr_printf("\x1b[32m> Supported: OpenAI, Google, Anthropic, DeepSeek, xAI\n");
-    scr_printf("\x1b[36m> Network: OFFLINE (radioactive interference)\n");
-    ps2_sleep(500);
+    /* Initialize terminal and keyboard */
+    term_init();
+    kb_init();
     
-    /* Show provider status in header */
-    print_border();
-    scr_printf("| [ %s ] v1.1 - Multi-Provider Mode              |\n", 
-               providers[current_provider].name);
-    scr_printf("| Nuclear Winter Edition                       |\n");
-    print_border();
+    /* Boot sequence */
+    scr_printf("\x1b[2J");  /* Clear screen */
+    scr_printf("\n");  /* Push down for overscan */
+    scr_printf("PS2Claw v1.6 - Terminal Mode\n");
+    ps2_sleep(300);
+    scr_printf("OpenClaw on PlayStation 2\n");
+    ps2_sleep(300);
+    scr_printf("MIPS R5900 @ 300MHz, 32MB RAM\n");
+    ps2_sleep(300);
+    scr_printf("AI: ENABLED\n");
+    scr_printf("Providers: OpenAI, Google, Anthropic, DeepSeek, xAI\n");
+    ps2_sleep(500);
     
     /* Load configuration */
     load_config();
     
-    /* Show current provider info */
+    /* Show initial status */
     Provider *cp = get_current_provider();
     if (cp->enabled && cp->api_key[0]) {
-        scr_printf("[CFG] Provider: %s\n", cp->name);
-        scr_printf("[CFG] Model: %s\n", cp->model);
-        scr_printf("[CFG] Endpoint: %s\n", cp->endpoint);
-        scr_printf("[NET] %s mode\n\n", demo_mode ? "Demo" : "Online");
+        scr_printf("Provider: %s\n", cp->name);
+        scr_printf("Model: %s\n", cp->model);
     } else {
-        scr_printf("[CFG] No provider configured (demo mode)\n");
-        scr_printf("[NET] %s mode\n\n", demo_mode ? "Demo" : "Online");
+        scr_printf("No provider configured (demo mode)\n");
     }
     
-    ps2_sleep(500);
-    print_border();
-    print_provider_footer();
-    print_border();
+    scr_printf("%s mode\n", demo_mode ? "Demo" : "Online");
+    ps2_sleep(1000);
     
-    /* Show initial prompt */
-    scr_printf("\x1b[36m[ AWAITING INPUT ]\x1b[0m\n");
-    scr_printf("(Type 'quit' to exit, TAB to cycle provider, 1-5 to select)\n\n");
-    
-    /* Main loop - waits forever for valid input */
+    /* Main loop */
     while (1) {
-        scr_printf("> ");
-        fflush(stdout);
+        /* Handle input */
+        handle_input();
         
-        /* Clear prompt buffer */
-        memset(prompt, 0, sizeof(prompt));
+        /* Render */
+        render();
         
-        /* Read input using keyboard */
-        int input_result = read_kbd_line(prompt, sizeof(prompt));
-        
-        /* Handle special keyboard input */
-        if (input_result == -1) {
-            /* Escape - exit */
-            scr_printf("\n");
-            print_border();
-            scr_printf("| Session terminated.                          |\n");
-            scr_printf("| -=[ PS2CLAW ]=-                              |\n");
-            print_border();
-            ps2_sleep(2000);
-            break;
-        }
-        
-        if (input_result == 2) {
-            /* TAB - cycle provider */
-            cycle_provider();
-            cp = get_current_provider();
-            /* Redraw header */
-            print_border();
-            scr_printf("| [ %s ] v1.1 - Multi-Provider Mode              |\n", 
-                       cp->name);
-            scr_printf("| Nuclear Winter Edition                       |\n");
-            print_border();
-            if (cp->enabled && cp->api_key[0]) {
-                scr_printf("[CFG] Provider: %s\n", cp->name);
-                scr_printf("[CFG] Model: %s\n", cp->model);
-            } else {
-                scr_printf("[CFG] No provider configured (demo mode)\n");
-            }
-            print_border();
-            print_provider_footer();
-            print_border();
-            scr_printf("\x1b[36m[ AWAITING INPUT ]\x1b[0m\n");
-            continue;
-        }
-        
-        if (input_result >= 11 && input_result <= 15) {
-            /* Number key 1-5 - select provider */
-            int idx = input_result - 11;
-            if (select_provider(idx) == 0) {
-                cp = get_current_provider();
-                scr_printf("[CFG] Switched to: %s\n", cp->name);
-            } else {
-                scr_printf("[CFG] Provider %d not configured\n", idx + 1);
-            }
-            /* Redraw header */
-            print_border();
-            scr_printf("| [ %s ] v1.1 - Multi-Provider Mode              |\n", 
-                       cp->name);
-            scr_printf("| Nuclear Winter Edition                       |\n");
-            print_border();
-            print_provider_footer();
-            print_border();
-            scr_printf("\x1b[36m[ AWAITING INPUT ]\x1b[0m\n");
-            continue;
-        }
-        
-        if (input_result == 0) {
-            /* Empty input */
-            ps2_sleep(100);
-            continue;
-        }
-        
-        /* Check for quit (user typed "quit" or pressed Escape) */
-        if (strcmp(prompt, "quit") == 0 || strcmp(prompt, "exit") == 0) {
-            scr_printf("\n");
-            print_border();
-            scr_printf("| Session terminated.                          |\n");
-            scr_printf("| -=[ PS2CLAW ]=-                              |\n");
-            print_border();
-            ps2_sleep(2000);
-            break;
-        }
-        
-        /* Check for help */
-        if (strcmp(prompt, "help") == 0) {
-            print_border();
-            scr_printf("| COMMANDS:                                    |\n");
-            scr_printf("|   <text> - Chat with PS2Claw                 |\n");
-            scr_printf("|   TAB    - Cycle through AI providers        |\n");
-            scr_printf("|   1-5    - Quick-select AI provider         |\n");
-            scr_printf("|   demo   - Toggle demo mode                  |\n");
-            scr_printf("|   quit   - Exit session                      |\n");
-            print_border();
-            print_provider_footer();
-            print_border();
-            scr_printf("\x1b[36m[ AWAITING INPUT ]\x1b[0m\n");
-            ps2_sleep(200);
-            continue;
-        }
-        
-        /* Check for demo toggle */
-        if (strcmp(prompt, "demo") == 0) {
-            demo_mode = !demo_mode;
-            scr_printf("[CFG] Demo mode: %s\n", demo_mode ? "ON" : "OFF");
-            scr_printf("\x1b[36m[ AWAITING INPUT ]\x1b[0m\n");
-            ps2_sleep(200);
-            continue;
-        }
-        
-        /* Check for provider info */
-        if (strcmp(prompt, "provider") == 0 || strcmp(prompt, "providers") == 0) {
-            cp = get_current_provider();
-            print_border();
-            scr_printf("| PROVIDER STATUS:                             |\n");
-            scr_printf("| Current: %s\n", cp->name);
-            scr_printf("| Model: %s\n", cp->model);
-            scr_printf("| Endpoint: %s\n", cp->endpoint);
-            print_border();
-            print_provider_footer();
-            print_border();
-            scr_printf("\x1b[36m[ AWAITING INPUT ]\x1b[0m\n");
-            ps2_sleep(200);
-            continue;
-        }
-        
-        /* Show processing */
-        scr_printf("\x1b[33m[ Processing... ]\x1b[0m\n");
-        
-        /* Get response */
-        if (demo_mode) {
-            /* Demo mode - return response then stop at prompt */
-            print_border();
-            scr_printf("%s\n", demo_responses[demo_index]);
-            print_border();
-            /* Save to USB chat log */
-            save_chat_log(prompt, demo_responses[demo_index]);
-            demo_index = (demo_index + 1) % DEMO_RESPONSES;
-        } else {
-            /* Online mode - use current provider */
-            cp = get_current_provider();
-            
-            if (!cp->enabled || !cp->api_key[0]) {
-                print_border();
-                scr_printf("| [ERROR] No provider configured               |\n");
-                scr_printf("| Edit config.txt to add API keys             |\n");
-                print_border();
-            } else if (chat_request(prompt, cp, response, sizeof(response)) == 0) {
-                print_border();
-                scr_printf("%s\n", response);
-                print_border();
-                /* Save to USB chat log */
-                save_chat_log(prompt, response);
-            } else {
-                print_border();
-                scr_printf("| [ERROR] Request failed - network issue?    |\n");
-                scr_printf("| Type 'demo' to switch to offline mode       |\n");
-                print_border();
-            }
-        }
-        
-        /* Show prompt again */
-        scr_printf("\x1b[36m[ AWAITING INPUT ]\x1b[0m\n");
+        /* Small delay */
+        ps2_sleep(50);
     }
     
-    /* Cleanup keyboard */
+    /* Cleanup */
+    pad_shutdown();
     PS2KbdClose();
     
     return 0;

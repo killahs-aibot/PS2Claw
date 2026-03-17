@@ -26,11 +26,11 @@ CFLAGS += $(EE_INC) $(PORTS_INC)
 
 # Linker flags
 LDFLAGS = -L$(EE_LIB) -L$(PORTS_LIB)
-LDFLAGS += -lcurl -lwolfssl -lz -lnetman -lps2ip -ldebug -lcglue -lkernel -lstdc++ -lsupc++ -lm -lkbd
+LDFLAGS += -lcurl -lwolfssl -lz -lnetman -lps2ip -ldebug -lcglue -lkernel -lstdc++ -lsupc++ -lm -lkbd -lpad
 
 # Output
 TARGET = PS2CLAW.ELF
-OBJS = main.o
+OBJS = main.o pad.o keyboard.o terminal.o
 
 .PHONY: all clean check
 
@@ -43,7 +43,19 @@ $(TARGET): $(OBJS)
 	@file $(TARGET)
 	@ls -lh $(TARGET)
 
-main.o: src/main.c
+main.o: src/main.c src/pad.h src/keyboard.h src/terminal.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+pad.o: src/pad.c src/pad.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+menu.o: src/menu.c src/menu.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+keyboard.o: src/keyboard.c src/keyboard.h src/pad.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+terminal.o: src/terminal.c src/terminal.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
@@ -52,7 +64,7 @@ clean:
 # For development - check toolchain
 check:
 	@echo "Toolchain check:"
-	$(CC) --version | head -1
+	@$(CC) --version | head -1
 	@echo "SDK: $(PS2SDK)"
 	@echo "Libraries:"
-	ls $(EE_LIB)/libcglue.a $(PORTS_LIB)/libcurl.a 2>/dev/null
+	@ls $(EE_LIB)/libcglue.a $(PORTS_LIB)/libcurl.a 2>/dev/null
