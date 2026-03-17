@@ -38,18 +38,51 @@ Super simple — no Linux needed! Choose one method:
 
 Create a config file at `mc0:/PS2CLAW/config.txt` on your memory card:
 
+**Multi-Provider Config Format:**
 ```
-api_key=your_openrouter_key_here
-model=openai/gpt-4o-mini
+[openai]
+api_key=your_openai_key_here
+model=gpt-4o-mini
+
+[google]
+api_key=your_google_key_here
+model=gemini-1.5-flash-8b
+
+[anthropic]
+api_key=your_anthropic_key_here
+model=claude-3-haiku-20240307
+
+[deepseek]
+api_key=your_deepseek_key_here
+model=deepseek-chat
+
+[xai]
+api_key=your_xai_key_here
+model=grok-2-1212
+
+default_provider=openai
 demo_mode=false
 ```
 
-Get a free key at: https://openrouter.ai
+**Supported Providers:**
+| # | Provider | Endpoint | Auth |
+|---|----------|----------|------|
+| 1 | OpenAI | `api.openai.com/v1/chat/completions` | Bearer |
+| 2 | Google | `generativelanguage.googleapis.com/v1beta/models` | Bearer |
+| 3 | Anthropic | `api.anthropic.com/v1/messages` | x-api-key |
+| 4 | DeepSeek | `api.deepseek.com/v1/chat/completions` | Bearer |
+| 5 | xAI | `api.x.ai/v1/chat/completions` | Bearer |
 
-**Config options:**
-- `api_key` - Your OpenRouter API key (required for online mode)
-- `model` - Model to use (default: `google/gemini-3.1-flash-lite-preview`)
+**Global Config Options:**
+- `default_provider` - Provider to use by default (1-5 or name)
 - `demo_mode` - Set to `true` for offline demo responses
+
+Get API keys from:
+- OpenAI: https://platform.openai.com
+- Google: https://aistudio.google.com/app/apikey
+- Anthropic: https://console.anthropic.com
+- DeepSeek: https://platform.deepseek.com
+- xAI: https://console.x.ai
 
 ### Chat Logs
 
