@@ -1,0 +1,3 @@
+api_key=YOUR_API_KEY_HERE
+model=openai/gpt-4o-mini
+demo_mode=true

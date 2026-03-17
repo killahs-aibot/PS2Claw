@@ -38,6 +38,51 @@ static const char *demo_responses[DEMO_RESPONSES] = {
 /* Demo mode flag */
 static int demo_mode = 1;
 
+/* Config file */
+#define CONFIG_FILE "mc0:/PS2CLAW/config.txt"
+#define MAX_CONFIG_LINE 256
+
+/* Parse config value from line "key=value" */
+static void parse_config_line(char *line, char *key, char *value) {
+    char *eq = strchr(line, '=');
+    if (eq) {
+        *eq = '\0';
+        strcpy(key, line);
+        strcpy(value, eq + 1);
+        /* Trim trailing newline */
+        size_t len = strlen(value);
+        if (len > 0 && value[len-1] == '\n') value[len-1] = '\0';
+    }
+}
+
+/* Load config from file */
+static void load_config(char *api_key, size_t api_len, char *model, size_t model_len) {
+    FILE *fp = fopen(CONFIG_FILE, "r");
+    if (!fp) {
+        scr_printf("[CFG] No config file, using defaults\n");
+        return;
+    }
+    
+    char line[MAX_CONFIG_LINE];
+    while (fgets(line, sizeof(line), fp)) {
+        char key[MAX_CONFIG_LINE], value[MAX_CONFIG_LINE];
+        parse_config_line(line, key, value);
+        
+        if (strcmp(key, "api_key") == 0) {
+            strncpy(api_key, value, api_len - 1);
+            api_key[api_len - 1] = '\0';
+            scr_printf("[CFG] API key loaded\n");
+        } else if (strcmp(key, "model") == 0) {
+            strncpy(model, value, model_len - 1);
+            model[model_len - 1] = '\0';
+            scr_printf("[CFG] Model: %s\n", model);
+        } else if (strcmp(key, "demo_mode") == 0) {
+            demo_mode = (strcmp(value, "true") == 0 || strcmp(value, "1") == 0);
+        }
+    }
+    fclose(fp);
+}
+
 /* Response buffer */
 typedef struct {
     char *data;
@@ -231,6 +276,7 @@ int main(int argc, char *argv[]) {
     
     /* Initialize debug screen */
     init_scr();
+    scr_setCursor(0);
     
     /* Move text down a bit */
     scr_printf("\n\n\n\n\n\n\n\n");
@@ -252,12 +298,34 @@ int main(int argc, char *argv[]) {
     scr_printf("| Nuclear Winter Edition                       |\n");
     print_border();
     
-    /* Get model */
+    /* Get model from env or use default */
     model = getenv("MODEL");
     if (!model) model = DEFAULT_MODEL;
     
+    /* Load API key from config file */
+    char config_api_key[128] = {0};
+    char config_model[64] = {0};
+    load_config(config_api_key, sizeof(config_api_key), config_model, sizeof(config_model));
+    
+    /* Use config API key if loaded, otherwise env */
+    if (config_api_key[0]) {
+        api_key = config_api_key;
+    } else {
+        api_key = getenv("API_KEY");
+    }
+    
+    /* Use config model if loaded */
+    if (config_model[0]) {
+        model = config_model;
+    }
+    
     scr_printf("[CFG] Model: %s\n", model);
-    scr_printf("[NET] Demo mode - offline responses\n\n");
+    if (api_key) {
+        scr_printf("[CFG] API key: loaded\n");
+    } else {
+        scr_printf("[CFG] API key: missing (demo mode)\n");
+    }
+    scr_printf("[NET] %s mode\n\n", demo_mode ? "Demo" : "Online");
     
     ps2_sleep(500);
     print_border();

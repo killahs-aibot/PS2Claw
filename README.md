@@ -36,11 +36,20 @@ Super simple — no Linux needed! Choose one method:
 
 ### Set your API key
 
+Create a config file at `mc0:/PS2CLAW/config.txt` on your memory card:
+
 ```
-export OPENROUTER_API_KEY=your_key_here
+api_key=your_openrouter_key_here
+model=openai/gpt-4o-mini
+demo_mode=false
 ```
 
 Get a free key at: https://openrouter.ai
+
+**Config options:**
+- `api_key` - Your OpenRouter API key (required for online mode)
+- `model` - Model to use (default: `google/gemini-3.1-flash-lite-preview`)
+- `demo_mode` - Set to `true` for offline demo responses
 
 Enjoy 🤖
 
@@ -57,10 +66,10 @@ For live AI responses, you need internet:
    - Use a compatible WiFi adapter, or
    - Use a Powerline adapter (Ethernet over home wiring)
 
-### Optional Environment Variables
+### Optional Config Options
 
-- `OPENROUTER_API_KEY` - Your OpenRouter API key (required)
-- `MODEL` - Model to use (default: `google/gemini-3.1-flash-lite-preview`)
+- `model` - Model to use (default: `google/gemini-3.1-flash-lite-preview`)
+- `demo_mode` - `true` for offline demo mode, `false` for live AI
 
 ## Build from Source
 
@@ -155,12 +164,15 @@ Output sizes:
 ps2claw/
 ├── src/
 │   └── main.c          # Main program (console-only)
+├── config.json         # Example config (rename to config.txt for PS2)
 ├── Makefile            # Build configuration
 ├── PS2CLAW.ELF         # Built executable (12MB)
-├── PS2CLAW-packed.elf  # Compressed executable (643KB)
+├── PS2CLAW-packed.elf # Compressed executable (643KB)
 ├── README.md           # This file
 └── docs/               # Documentation
 ```
+
+**To use on PS2:** Copy `config.txt` (not .json) to `mc0:/PS2CLAW/config.txt` on your memory card.
 
 ---
 
