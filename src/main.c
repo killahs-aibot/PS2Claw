@@ -83,16 +83,37 @@ static void load_config(char *api_key, size_t api_len, char *model, size_t model
     fclose(fp);
 }
 
-/* Chat log to USB */
-#define CHAT_LOG_FILE "mass:/PS2CLAW/chatlog.txt"
+/* Chat log to USB - one file per session */
+static char current_log_file[64] = {0};
+
+static void start_chat_session(void) {
+    if (current_log_file[0]) return;  /* Already started */
+    
+    time_t now = time(NULL);
+    struct tm *tm = localtime(&now);
+    snprintf(current_log_file, sizeof(current_log_file), 
+             "mass:/PS2CLAW/%04d%02d%02d-%02d%02d%02d.txt",
+             tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+             tm->tm_hour, tm->tm_min, tm->tm_sec);
+    
+    /* Create directory if needed - try creating file, will fail silently if exists */
+    FILE *fp = fopen(current_log_file, "w");
+    if (fp) {
+        fprintf(fp, "=== PS2Claw Session Started ===\n\n");
+        fclose(fp);
+    }
+}
 
 static void save_chat_log(const char *prompt, const char *response) {
-    FILE *fp = fopen(CHAT_LOG_FILE, "a");
+    start_chat_session();
+    if (!current_log_file[0]) return;
+    
+    FILE *fp = fopen(current_log_file, "a");
     if (!fp) return;
     
     time_t now = time(NULL);
     char *ts = ctime(&now);
-    ts[strlen(ts)-1] = '\0';  /* Remove newline */
+    ts[strlen(ts)-1] = '\0';
     
     fprintf(fp, "[%s]\n", ts);
     fprintf(fp, "YOU: %s\n", prompt);
