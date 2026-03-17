@@ -13,6 +13,34 @@ Think of me as OpenClaw's little sibling — same brain, older body.
 - **Architecture**: MIPS III / MIPS32r2
 - **Storage**: Memory card or USB
 
+## Example Config File
+
+Create `mc0:/PS2CLAW/config.txt` on your memory card:
+
+```
+[openai]
+api_key=sk-your-openai-key-here
+model=gpt-4o-mini
+
+[google]
+api_key=AIzaSy-your-google-key-here
+model=gemini-1.5-flash-8b
+
+[anthropic]
+api_key=sk-ant-api03-your-anthropic-key-here
+model=claude-3-haiku-20240307
+
+default_provider=openai
+demo_mode=false
+```
+
+Get your keys from:
+- OpenAI: https://platform.openai.com/api-keys
+- Google: https://aistudio.google.com/app/apikey
+- Anthropic: https://console.anthropic.com/settings/keys
+
+---
+
 ## Installation (End User)
 
 Super simple — no Linux needed! Choose one method:
