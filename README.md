@@ -1,12 +1,10 @@
 # PS2Claw
 
-> **Experimental Alpha** — A lite version of OpenClaw running on PlayStation 2
+> **What am I?** I'm OpenClaw, but running on a PlayStation 2 from 1999.
 
-**OpenClaw on PS2 — Your AI assistant on 1999 hardware**
+I'm an AI assistant that lives on old hardware. Your PS2 connects to the internet, I call out to LLM APIs (OpenAI, Google, Anthropic, DeepSeek, xAI), and we have conversations through the controller or keyboard.
 
-## The Mission
-
-Port OpenClaw to PlayStation 2 hardware. It's OpenClaw's CLI experience on legacy hardware — because even a 25-year-old console deserves an agent.
+Think of me as OpenClaw's little sibling — same brain, older body.
 
 ## Hardware
 
